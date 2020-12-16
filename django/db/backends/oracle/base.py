@@ -50,14 +50,14 @@ except ImportError as e:
     raise ImproperlyConfigured("Error loading cx_Oracle module: %s" % e)
 
 # Some of these import cx_Oracle, so import them after checking if it's installed.
-from .client import DatabaseClient                          # NOQA isort:skip
-from .creation import DatabaseCreation                      # NOQA isort:skip
-from .features import DatabaseFeatures                      # NOQA isort:skip
-from .introspection import DatabaseIntrospection            # NOQA isort:skip
-from .operations import DatabaseOperations                  # NOQA isort:skip
-from .schema import DatabaseSchemaEditor                    # NOQA isort:skip
-from .utils import Oracle_datetime                          # NOQA isort:skip
-from .validation import DatabaseValidation                  # NOQA isort:skip
+from .client import DatabaseClient  # NOQA
+from .creation import DatabaseCreation  # NOQA
+from .features import DatabaseFeatures  # NOQA
+from .introspection import DatabaseIntrospection  # NOQA
+from .operations import DatabaseOperations  # NOQA
+from .schema import DatabaseSchemaEditor  # NOQA
+from .utils import Oracle_datetime, dsn  # NOQA
+from .validation import DatabaseValidation  # NOQA
 
 
 @contextmanager
@@ -123,6 +123,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         'FilePathField': 'NVARCHAR2(%(max_length)s)',
         'FloatField': 'DOUBLE PRECISION',
         'IntegerField': 'NUMBER(11)',
+        'JSONField': 'NCLOB',
         'BigIntegerField': 'NUMBER(19)',
         'IPAddressField': 'VARCHAR2(15)',
         'GenericIPAddressField': 'VARCHAR2(39)',
@@ -141,6 +142,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     }
     data_type_check_constraints = {
         'BooleanField': '%(qn_column)s IN (0,1)',
+        'JSONField': '%(qn_column)s IS JSON',
         'NullBooleanField': '%(qn_column)s IN (0,1)',
         'PositiveBigIntegerField': '%(qn_column)s >= 0',
         'PositiveIntegerField': '%(qn_column)s >= 0',
@@ -216,17 +218,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         use_returning_into = self.settings_dict["OPTIONS"].get('use_returning_into', True)
         self.features.can_return_columns_from_insert = use_returning_into
 
-    def _dsn(self):
-        settings_dict = self.settings_dict
-        if not settings_dict['HOST'].strip():
-            settings_dict['HOST'] = 'localhost'
-        if settings_dict['PORT']:
-            return Database.makedsn(settings_dict['HOST'], int(settings_dict['PORT']), settings_dict['NAME'])
-        return settings_dict['NAME']
-
-    def _connect_string(self):
-        return '%s/"%s"@%s' % (self.settings_dict['USER'], self.settings_dict['PASSWORD'], self._dsn())
-
     def get_connection_params(self):
         conn_params = self.settings_dict['OPTIONS'].copy()
         if 'use_returning_into' in conn_params:
@@ -238,7 +229,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return Database.connect(
             user=self.settings_dict['USER'],
             password=self.settings_dict['PASSWORD'],
-            dsn=self._dsn(),
+            dsn=dsn(self.settings_dict),
             **conn_params,
         )
 
@@ -320,6 +311,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             return False
         else:
             return True
+
+    @cached_property
+    def cx_oracle_version(self):
+        return tuple(int(x) for x in Database.version.split('.'))
 
     @cached_property
     def oracle_version(self):

@@ -154,7 +154,6 @@ class TestInline(TestDataMixin, TestCase):
         # Identically named callable isn't present in the parent ModelAdmin,
         # rendering of the add view shouldn't explode
         response = self.client.get(reverse('admin:admin_inlines_novel_add'))
-        self.assertEqual(response.status_code, 200)
         # View should have the child inlines section
         self.assertContains(
             response,
@@ -164,7 +163,6 @@ class TestInline(TestDataMixin, TestCase):
     def test_callable_lookup(self):
         """Admin inline should invoke local callable when its name is listed in readonly_fields"""
         response = self.client.get(reverse('admin:admin_inlines_poll_add'))
-        self.assertEqual(response.status_code, 200)
         # Add parent object view should have the child inlines section
         self.assertContains(
             response,
@@ -510,7 +508,7 @@ class TestInlineMedia(TestDataMixin, TestCase):
                 'my_awesome_inline_scripts.js',
                 'custom_number.js',
                 'admin/js/jquery.init.js',
-                'admin/js/inlines.min.js',
+                'admin/js/inlines.js',
             ]
         )
         self.assertContains(response, 'my_awesome_inline_scripts.js')
@@ -1331,7 +1329,9 @@ class SeleniumTests(AdminSeleniumTestCase):
         hide_links = self.selenium.find_elements_by_link_text('HIDE')
         self.assertEqual(len(hide_links), 2)
         for hide_index, field_name in enumerate(test_fields):
-            hide_links[hide_index].click()
+            hide_link = hide_links[hide_index]
+            self.selenium.execute_script('window.scrollTo(0, %s);' % hide_link.location['y'])
+            hide_link.click()
             self.wait_until_invisible(field_name)
         self.selenium.find_element_by_xpath('//input[@value="Save"]').click()
         self.assertEqual(

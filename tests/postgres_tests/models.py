@@ -1,10 +1,9 @@
-from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 
 from .fields import (
     ArrayField, BigIntegerRangeField, CICharField, CIEmailField, CITextField,
     DateRangeField, DateTimeRangeField, DecimalRangeField, EnumField,
-    HStoreField, IntegerRangeField, JSONField, SearchVectorField,
+    HStoreField, IntegerRangeField, SearchVectorField,
 )
 
 
@@ -47,6 +46,7 @@ class IntegerArrayModel(PostgreSQLModel):
 class NullableIntegerArrayModel(PostgreSQLModel):
     field = ArrayField(models.IntegerField(), blank=True, null=True)
     field_nested = ArrayField(ArrayField(models.IntegerField(null=True)), null=True)
+    order = models.IntegerField(null=True)
 
 
 class CharArrayModel(PostgreSQLModel):
@@ -68,7 +68,7 @@ class OtherTypesArrayModel(PostgreSQLModel):
     uuids = ArrayField(models.UUIDField(), default=list)
     decimals = ArrayField(models.DecimalField(max_digits=5, decimal_places=2), default=list)
     tags = ArrayField(TagField(), blank=True, null=True)
-    json = ArrayField(JSONField(default=dict), default=list)
+    json = ArrayField(models.JSONField(default=dict), default=list)
     int_ranges = ArrayField(IntegerRangeField(), blank=True, null=True)
     bigint_ranges = ArrayField(BigIntegerRangeField(), blank=True, null=True)
 
@@ -150,26 +150,22 @@ class RangeLookupsModel(PostgreSQLModel):
     decimal_field = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
 
 
-class JSONModel(PostgreSQLModel):
-    field = JSONField(blank=True, null=True)
-    field_custom = JSONField(blank=True, null=True, encoder=DjangoJSONEncoder)
-
-
 class ArrayFieldSubclass(ArrayField):
     def __init__(self, *args, **kwargs):
         super().__init__(models.IntegerField())
 
 
-class AggregateTestModel(models.Model):
+class AggregateTestModel(PostgreSQLModel):
     """
     To test postgres-specific general aggregation functions
     """
     char_field = models.CharField(max_length=30, blank=True)
     integer_field = models.IntegerField(null=True)
     boolean_field = models.BooleanField(null=True)
+    json_field = models.JSONField(null=True)
 
 
-class StatTestModel(models.Model):
+class StatTestModel(PostgreSQLModel):
     """
     To test postgres-specific aggregation functions for statistics
     """
@@ -196,3 +192,4 @@ class HotelReservation(PostgreSQLModel):
     start = models.DateTimeField()
     end = models.DateTimeField()
     cancelled = models.BooleanField(default=False)
+    requirements = models.JSONField(blank=True, null=True)

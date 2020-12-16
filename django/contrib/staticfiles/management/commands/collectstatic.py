@@ -3,6 +3,7 @@ import os
 from django.apps import apps
 from django.contrib.staticfiles.finders import get_finders
 from django.contrib.staticfiles.storage import staticfiles_storage
+from django.core.checks import Tags
 from django.core.files.storage import FileSystemStorage
 from django.core.management.base import BaseCommand, CommandError
 from django.core.management.color import no_style
@@ -15,7 +16,7 @@ class Command(BaseCommand):
     settings.STATIC_ROOT.
     """
     help = "Collect static files in a single location."
-    requires_system_checks = False
+    requires_system_checks = [Tags.staticfiles]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,7 +147,6 @@ class Command(BaseCommand):
 
     def handle(self, **options):
         self.set_options(**options)
-
         message = ['\n']
         if self.dry_run:
             message.append(

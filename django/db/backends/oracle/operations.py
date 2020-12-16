@@ -89,7 +89,8 @@ END;
             # https://docs.oracle.com/en/database/oracle/oracle-database/18/sqlrf/EXTRACT-datetime.html
             return "EXTRACT(%s FROM %s)" % (lookup_type.upper(), field_name)
 
-    def date_trunc_sql(self, lookup_type, field_name):
+    def date_trunc_sql(self, lookup_type, field_name, tzname=None):
+        field_name = self._convert_field_to_tz(field_name, tzname)
         # https://docs.oracle.com/en/database/oracle/oracle-database/18/sqlrf/ROUND-and-TRUNC-Date-Functions.html
         if lookup_type in ('year', 'month'):
             return "TRUNC(%s, '%s')" % (field_name, lookup_type.upper())
@@ -114,7 +115,7 @@ END;
         return tzname
 
     def _convert_field_to_tz(self, field_name, tzname):
-        if not settings.USE_TZ:
+        if not (settings.USE_TZ and tzname):
             return field_name
         if not self._tzname_re.match(tzname):
             raise ValueError("Invalid time zone name: %s" % tzname)
@@ -161,10 +162,11 @@ END;
             sql = "CAST(%s AS DATE)" % field_name  # Cast to DATE removes sub-second precision.
         return sql
 
-    def time_trunc_sql(self, lookup_type, field_name):
+    def time_trunc_sql(self, lookup_type, field_name, tzname=None):
         # The implementation is similar to `datetime_trunc_sql` as both
         # `DateTimeField` and `TimeField` are stored as TIMESTAMP where
         # the date part of the later is ignored.
+        field_name = self._convert_field_to_tz(field_name, tzname)
         if lookup_type == 'hour':
             sql = "TRUNC(%s, 'HH24')" % field_name
         elif lookup_type == 'minute':
@@ -176,7 +178,7 @@ END;
     def get_db_converters(self, expression):
         converters = super().get_db_converters(expression)
         internal_type = expression.output_field.get_internal_type()
-        if internal_type == 'TextField':
+        if internal_type in ['JSONField', 'TextField']:
             converters.append(self.convert_textfield_value)
         elif internal_type == 'BinaryField':
             converters.append(self.convert_binaryfield_value)
@@ -269,7 +271,7 @@ END;
         return tuple(columns)
 
     def field_cast_sql(self, db_type, internal_type):
-        if db_type and db_type.endswith('LOB'):
+        if db_type and db_type.endswith('LOB') and internal_type != 'JSONField':
             return "DBMS_LOB.SUBSTR(%s)"
         else:
             return "%s"
@@ -307,6 +309,8 @@ END;
     def lookup_cast(self, lookup_type, internal_type=None):
         if lookup_type in ('iexact', 'icontains', 'istartswith', 'iendswith'):
             return "UPPER(%s)"
+        if internal_type == 'JSONField' and lookup_type == 'exact':
+            return 'DBMS_LOB.SUBSTR(%s)'
         return "%s"
 
     def max_in_list_size(self):
@@ -338,9 +342,6 @@ END;
         # that stage so we aren't really making the name longer here.
         name = name.replace('%', '%%')
         return name.upper()
-
-    def random_function_sql(self):
-        return "DBMS_RANDOM.RANDOM"
 
     def regex_lookup(self, lookup_type):
         if lookup_type == 'regex':
@@ -492,18 +493,6 @@ END;
                     # Only one AutoField is allowed per model, so don't
                     # continue to loop
                     break
-            for f in model._meta.many_to_many:
-                if not f.remote_field.through:
-                    no_autofield_sequence_name = self._get_no_autofield_sequence_name(f.m2m_db_table())
-                    table = self.quote_name(f.m2m_db_table())
-                    column = self.quote_name('id')
-                    output.append(query % {
-                        'no_autofield_sequence_name': no_autofield_sequence_name,
-                        'table': table,
-                        'column': column,
-                        'table_name': strip_quotes(table),
-                        'column_name': 'ID',
-                    })
         return output
 
     def start_transaction_sql(self):
@@ -567,6 +556,9 @@ END;
 
         return Oracle_datetime(1900, 1, 1, value.hour, value.minute,
                                value.second, value.microsecond)
+
+    def adapt_decimalfield_value(self, value, max_digits=None, decimal_places=None):
+        return value
 
     def combine_expression(self, connector, sub_expressions):
         lhs, rhs = sub_expressions

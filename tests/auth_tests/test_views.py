@@ -1,10 +1,9 @@
 import datetime
 import itertools
-import os
 import re
 from importlib import import_module
 from unittest import mock
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 from django.apps import apps
 from django.conf import settings
@@ -201,7 +200,7 @@ class PasswordResetTest(AuthViewsTestCase):
     def _read_signup_email(self, email):
         urlmatch = re.search(r"https?://[^/]*(/.*reset/\S*)", email.body)
         self.assertIsNotNone(urlmatch, "No URL found in sent email")
-        return urlmatch.group(), urlmatch.groups()[0]
+        return urlmatch[0], urlmatch[1]
 
     def test_confirm_valid(self):
         url, path = self._test_confirm_start()
@@ -414,7 +413,7 @@ class CustomUserPasswordResetTest(AuthViewsTestCase):
     def _read_signup_email(self, email):
         urlmatch = re.search(r"https?://[^/]*(/.*reset/\S*)", email.body)
         self.assertIsNotNone(urlmatch, "No URL found in sent email")
-        return urlmatch.group(), urlmatch.groups()[0]
+        return urlmatch[0], urlmatch[1]
 
     def test_confirm_valid_custom_user(self):
         url, path = self._test_confirm_start()
@@ -994,7 +993,7 @@ class LogoutTest(AuthViewsTestCase):
         in #25490.
         """
         response = self.client.get('/logout/')
-        self.assertIn('no-store', response['Cache-Control'])
+        self.assertIn('no-store', response.headers['Cache-Control'])
 
     def test_logout_with_overridden_redirect_url(self):
         # Bug 11223
@@ -1215,11 +1214,8 @@ class ChangelistTests(AuthViewsTestCase):
         rel_link = re.search(
             r'you can change the password using <a href="([^"]*)">this form</a>',
             response.content.decode()
-        ).groups()[0]
-        self.assertEqual(
-            os.path.normpath(user_change_url + rel_link),
-            os.path.normpath(password_change_url)
-        )
+        )[1]
+        self.assertEqual(urljoin(user_change_url, rel_link), password_change_url)
 
         response = self.client.post(
             password_change_url,

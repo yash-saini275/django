@@ -37,9 +37,7 @@ class Tests(TestCase):
             check_sqlite_version()
 
     def test_aggregation(self):
-        """
-        Raise NotImplementedError when aggregating on date/time fields (#19360).
-        """
+        """Raise NotSupportedError when aggregating on date/time fields."""
         for aggregate in (Sum, Avg, Variance, StdDev):
             with self.assertRaises(NotSupportedError):
                 Item.objects.all().aggregate(aggregate('time'))
@@ -131,7 +129,7 @@ class SchemaTests(TransactionTestCase):
         self.assertIsNotNone(match)
         self.assertEqual(
             'integer NOT NULL PRIMARY KEY AUTOINCREMENT',
-            match.group(1),
+            match[1],
             'Wrong SQL used to create an auto-increment column on SQLite'
         )
 

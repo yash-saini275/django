@@ -135,7 +135,7 @@ class BuildFile:
 
         return re.sub(
             r'^(#: .*)(' + re.escape(old_path) + r')',
-            lambda match: match.group().replace(old_path, new_path),
+            lambda match: match[0].replace(old_path, new_path),
             msgs,
             flags=re.MULTILINE
         )
@@ -206,7 +206,7 @@ class Command(BaseCommand):
     translatable_file_class = TranslatableFile
     build_file_class = BuildFile
 
-    requires_system_checks = False
+    requires_system_checks = []
 
     msgmerge_options = ['-q', '--previous']
     msguniq_options = ['--to-code=utf-8']
@@ -383,6 +383,14 @@ class Command(BaseCommand):
 
             # Build po files for each selected locale
             for locale in locales:
+                if '-' in locale:
+                    self.stdout.write(
+                        'invalid locale %s, did you mean %s?' % (
+                            locale,
+                            locale.replace('-', '_'),
+                        ),
+                    )
+                    continue
                 if self.verbosity > 0:
                     self.stdout.write('processing locale %s' % locale)
                 for potfile in potfiles:
@@ -647,7 +655,7 @@ class Command(BaseCommand):
                 with open(django_po, encoding='utf-8') as fp:
                     m = plural_forms_re.search(fp.read())
                 if m:
-                    plural_form_line = m.group('value')
+                    plural_form_line = m['value']
                     if self.verbosity > 1:
                         self.stdout.write('copying plural forms: %s' % plural_form_line)
                     lines = []
